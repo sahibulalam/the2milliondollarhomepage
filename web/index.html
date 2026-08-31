@@ -185,6 +185,20 @@
         </span>
       </div>
 
+      <!-- Dragging finds a box; these place it. Values are 1-based to match
+           the "from col N row N" line above, and are in units of sale. -->
+      <div class="seledit">
+        <label class="ne"><span class="lab">col</span>
+          <input type="number" id="e-col" min="1" step="1" inputmode="numeric"></label>
+        <label class="ne"><span class="lab">row</span>
+          <input type="number" id="e-row" min="1" step="1" inputmode="numeric"></label>
+        <label class="ne"><span class="lab">wide</span>
+          <input type="number" id="e-cols" min="1" step="1" inputmode="numeric"></label>
+        <label class="ne"><span class="lab">tall</span>
+          <input type="number" id="e-rows" min="1" step="1" inputmode="numeric"></label>
+        <span class="neunit" id="e-unit"></span>
+      </div>
+
       <div class="totalrow">
         <span class="k">total for this selection</span>
         <span class="v" id="sel-total">&mdash;</span>

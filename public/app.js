@@ -308,7 +308,11 @@ var quoteTimer = null, quoteSeq = 0;
 function refreshQuote(then) {
   if (!sel) return;
   var n = sel.cols * sel.rows;
-  if (n > G.max_tiles) { quote = null; drawSelection(); return; }
+  if (n > G.max_tiles) {
+    quote = null; drawSelection();
+    if (!scrim.hidden) syncSelection();
+    return;
+  }
   var mine = ++quoteSeq;
   var q = "col=" + sel.col + "&row=" + sel.row + "&cols=" + sel.cols + "&rows=" + sel.rows;
   fetch("/api/quote?" + q)
@@ -316,9 +320,14 @@ function refreshQuote(then) {
     .then(function (d) {
       if (mine !== quoteSeq) return;      // a newer drag superseded this one
       quote = d; drawSelection();
+      if (!scrim.hidden) syncSelection();
       if (then) then();
     })
-    .catch(function () { if (mine === quoteSeq) { quote = null; drawSelection(); } });
+    .catch(function () {
+      if (mine !== quoteSeq) return;
+      quote = null; drawSelection();
+      if (!scrim.hidden) syncSelection();
+    });
 }
 function quoteSoon() {
   clearTimeout(quoteTimer);
@@ -577,6 +586,44 @@ function closeDialog() {
   scrim.hidden = true;
 }
 
+/* Typed selection ------------------------------------------------------- */
+/* A box must stay inside the canvas, so size is clamped first and the corner
+   is then pulled back to fit it -- the alternative, clamping the corner
+   first, silently shrinks a box the moment it touches an edge. */
+function clampSel(n) {
+  n.cols = Math.max(1, Math.min(n.cols, G.cols));
+  n.rows = Math.max(1, Math.min(n.rows, G.rows));
+  n.col = Math.max(0, Math.min(n.col, G.cols - n.cols));
+  n.row = Math.max(0, Math.min(n.row, G.rows - n.rows));
+  return n;
+}
+
+function readEdits() {
+  if (!sel || !G) return;
+  var v = function (id, fallback) {
+    var n = parseInt($(id).value, 10);
+    return isNaN(n) ? fallback : n;
+  };
+  var next = clampSel({
+    col: v("e-col", sel.col + 1) - 1,
+    row: v("e-row", sel.row + 1) - 1,
+    cols: v("e-cols", sel.cols),
+    rows: v("e-rows", sel.rows)
+  });
+  if (next.col === sel.col && next.row === sel.row
+      && next.cols === sel.cols && next.rows === sel.rows) return;
+  sel = next; quote = null;
+  drawSelection(); syncSelection(); quoteSoon();
+}
+
+/* Writing back into the field being typed in would fight the typist: a bare
+   "1" clamps to 1 and the caret jumps before "4" of "14" is pressed. */
+function setNum(id, value, max) {
+  var e = $(id);
+  e.max = max;
+  if (document.activeElement !== e) e.value = value;
+}
+
 function syncSelection() {
   if (!sel) return;
   var n = sel.cols * sel.rows;
@@ -591,6 +638,14 @@ function syncSelection() {
         ? "every pixel in it is free"
         : num(quote.taken * G.px_per_block) + " pixels here are already owned")
     : "pricing…";
+
+  setNum("e-col", sel.col + 1, G.cols - sel.cols + 1);
+  setNum("e-row", sel.row + 1, G.rows - sel.rows + 1);
+  setNum("e-cols", sel.cols, G.cols - sel.col);
+  setNum("e-rows", sel.rows, G.rows - sel.row);
+  $("e-unit").textContent = G.byPixel
+    ? "pixels, 1-based"
+    : G.tile_px + "\u00d7" + G.tile_px + " blocks, 1-based";
 
   var b = $("minimap-box");
   b.style.left = (sel.col / G.cols * 100) + "%";
@@ -612,7 +667,17 @@ function syncSelection() {
 function verdict() {
   var box = $("dlg-status");
   box.textContent = "";
-  if (!quote) return;
+  if (!sel) return;
+  var over = sel.cols * sel.rows;
+  if (over > G.max_tiles) {
+    box.appendChild(el("div", "note bad",
+      "That is " + num(over) + " " + G.units + ". One purchase can cover "
+      + num(G.max_tiles) + " at most — " + num(G.max_tiles * G.px_per_block)
+      + " pixels."));
+    $("f-go").disabled = true;
+    return;
+  }
+  if (!quote) { $("f-go").disabled = true; return; }
   var cls = "note good", msg;
   if (!quote.available) {
     cls = "note bad";
@@ -800,6 +865,12 @@ Array.prototype.forEach.call(document.querySelectorAll(".ranksort button"), func
 /* what is this */
 var aboutScrim = $("about-scrim");
 function setAbout(open) { aboutScrim.hidden = !open; }
+["e-col", "e-row", "e-cols", "e-rows"].forEach(function (id) {
+  $(id).addEventListener("input", readEdits);
+  // Leaving the field is the moment to show what the clamp actually did.
+  $(id).addEventListener("blur", function () { if (sel) syncSelection(); });
+});
+
 $("about-open").addEventListener("click", function () { setAbout(true); });
 $("about-close").addEventListener("click", function () { setAbout(false); });
 $("about-dismiss").addEventListener("click", function () { setAbout(false); });

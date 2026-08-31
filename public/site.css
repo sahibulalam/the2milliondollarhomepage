@@ -511,6 +511,36 @@ input:focus{outline:none;box-shadow:var(--shadow-sm)}
   *,*::before,*::after{animation:none!important;transition:none!important}
 }
 
+/* ------------------------------------------------ selection by number --- */
+/* Dragging is how you find a box; these are how you place one exactly. They
+   sit above the total so a correction lands next to the price it changes. */
+.seledit{
+  display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px;margin:10px 0 12px;
+}
+.seledit .ne{display:flex;flex-direction:column;gap:3px;min-width:0}
+.seledit .lab{
+  font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.11em;
+  text-transform:uppercase;color:var(--ink-3);
+}
+.seledit input{
+  width:72px;padding:7px 8px;font-family:var(--mono);font-size:13px;
+  background:var(--card);color:var(--ink);border:2px solid var(--ink);
+  border-radius:var(--radius-sm);font-variant-numeric:tabular-nums;
+}
+.seledit input:focus{outline:2px solid var(--mint-ink);outline-offset:1px}
+.neunit{
+  font-family:var(--mono);font-size:10.5px;color:var(--ink-3);
+  padding-bottom:8px;white-space:nowrap;
+}
+/* Phones: four boxes will not sit on one line, so they go two by two and the
+   inputs stretch rather than staying at a desktop width. */
+@media (max-width:560px){
+  .seledit{gap:7px}
+  .seledit .ne{flex:1 1 calc(50% - 4px)}
+  .seledit input{width:100%}
+  .neunit{flex:1 1 100%;padding:0}
+}
+
 /* --------------------------------------------------------- site footer --- */
 /* The ownership line, carried on every view. The original Million Dollar
    Homepage ran the same notice, and for the same reason: the page links out
