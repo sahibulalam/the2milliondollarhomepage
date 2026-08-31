@@ -278,7 +278,7 @@ function drawSelection() {
     msg.className = "selinfo blocked";
     msg.appendChild(el("div", "k", "too big"));
     msg.appendChild(el("div", "big", num(n * G.px_per_block) + " px"));
-    msg.appendChild(el("div", "price",
+    msg.appendChild(el("div", "amount",
       "One claim can cover " + num(G.max_tiles * G.px_per_block)
       + " pixels at most. Drag a smaller box."));
     $("cta-nav").disabled = true;
@@ -290,7 +290,7 @@ function drawSelection() {
     msg.appendChild(el("div", "big",
       num(quote.taken * G.px_per_block) + " px"));
     msg.appendChild(el("div", "dim", "already owned"));
-    msg.appendChild(el("div", "price",
+    msg.appendChild(el("div", "amount",
       "Sold pixels stay sold. Move or resize your box."));
     $("cta-nav").disabled = true;
     return;
@@ -300,7 +300,7 @@ function drawSelection() {
   msg.appendChild(el("div", "big", num(n * G.px_per_block) + " px"));
   msg.appendChild(el("div", "dim", sel.cols + " \u00d7 " + sel.rows
     + (G.byPixel ? "" : " blocks")));
-  msg.appendChild(el("div", "price",
+  msg.appendChild(el("div", "amount",
     priced ? money(quote.total_cents) : "pricing\u2026"));
 }
 
