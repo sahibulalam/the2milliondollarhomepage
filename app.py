@@ -145,6 +145,18 @@ class Handler(BaseHTTPRequestHandler):
         sys.stderr.write("%s  %s\n" % (time.strftime("%H:%M:%S"), fmt % args))
 
     # --- plumbing ---------------------------------------------------------
+    def _is_https(self):
+        """Whether the browser reached us over TLS.
+
+        Behind a proxy the socket itself is plain HTTP, so the proxy's
+        X-Forwarded-Proto is the only signal -- with BASE_URL as a fallback for
+        proxies that do not set it.
+        """
+        proto = (self.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip()
+        if proto:
+            return proto == "https"
+        return config.BASE_URL.startswith("https://")
+
     def _send(self, code, body=b"", ctype="text/plain; charset=utf-8", extra=None):
         if isinstance(body, str):
             body = body.encode()
@@ -153,6 +165,12 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
+        if self._is_https():
+            # Without this the browser tries http:// first every time someone
+            # types the bare domain, and flags the navigation insecure even
+            # though it immediately redirects. No includeSubDomains or preload:
+            # both are hard to walk back, and neither is needed here.
+            self.send_header("Strict-Transport-Security", "max-age=31536000")
         for k, v in (extra or []):
             self.send_header(k, v)
         self.end_headers()
@@ -206,9 +224,11 @@ class Handler(BaseHTTPRequestHandler):
         if m:
             return m.group(1), None
         vid = secrets.token_urlsafe(16)
-        return vid, ("Set-Cookie",
-                     "mp_vid=%s; Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly"
-                     % vid)
+        cookie = ("mp_vid=%s; Path=/; Max-Age=31536000; SameSite=Lax; HttpOnly"
+                  % vid)
+        if self._is_https():
+            cookie += "; Secure"
+        return vid, ("Set-Cookie", cookie)
 
     # --- routing ----------------------------------------------------------
     def do_HEAD(self):

@@ -389,10 +389,13 @@ a{color:inherit}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 .dialog{
   width:min(470px,100%);max-height:calc(100vh - 44px);display:flex;flex-direction:column;
+  /* 100vh on a phone counts the space behind the address bar, so the footer
+     of a tall dialog sits under it. dvh is the visible height. */
   background:var(--card);border:2px solid var(--ink);border-radius:var(--radius);
   box-shadow:6px 6px 0 var(--ink);
   animation:rise .18s cubic-bezier(.2,.9,.3,1);
 }
+@supports (height:100dvh){ .dialog{max-height:calc(100dvh - 44px)} }
 @keyframes rise{from{opacity:0;transform:translate(-4px,10px)}to{opacity:1;transform:none}}
 .dialog > header{display:flex;align-items:center;gap:12px;padding:14px 16px;
   border-bottom:2px solid var(--ink)}
@@ -476,9 +479,11 @@ input:focus{outline:none;box-shadow:var(--shadow-sm)}
   .seg.vert{flex-direction:row;border-radius:99px}
   .seg.vert button{border-bottom:0;border-right:1px dashed var(--rule);padding:5px 11px}
   .rail .btn{width:auto;margin-left:auto}
-  .rail .selinfo{display:flex;align-items:baseline;gap:9px;padding:6px 10px;flex:1;min-width:0}
+  .rail .selinfo{display:flex;align-items:baseline;gap:9px;padding:6px 10px;
+                 flex:1 1 160px;min-width:0;overflow:hidden}
   .rail .selinfo .k{display:none}
-  .rail .selinfo .big{font-size:14px;margin:0;white-space:nowrap}
+  .rail .selinfo .big{font-size:14px;margin:0;white-space:nowrap;
+                      min-width:0;overflow:hidden;text-overflow:ellipsis}
   .rail .selinfo .dim{margin:0;white-space:nowrap}
   .rail .selinfo .amount{font-size:15px;margin:0;padding:0;border-top:0;margin-left:auto;white-space:nowrap}
   .rail .selhint{white-space:nowrap;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -494,18 +499,36 @@ input:focus{outline:none;box-shadow:var(--shadow-sm)}
   .ibtn{width:30px;height:30px}
   .sitefoot{font-size:9.5px;gap:1px 10px;line-height:1.5}
 }
-/* Narrow phones. The profile link goes -- it is not why anyone is here -- but
-   nothing else does: #about-open is the only trigger for the what-is-this
-   dialog, so hiding it would strand the explanation entirely. Everything else
-   shrinks instead, and the bar scrolls as a last resort so the buy button can
-   never be clipped away out of reach. */
+/* Narrow phones. The bar wraps onto a second line rather than scrolling: a
+   control pushed off the edge is one nobody finds, and every control here is
+   a destination. Only the profile link goes -- it is not why anyone is here.
+   #about-open stays, being the sole trigger for the dialog that explains the
+   site, and #cta stays because the rail's copy of it is disabled until
+   something is selected. */
 @media (max-width:560px){
-  .topbar{gap:6px;padding:0 7px;overflow-x:auto;scrollbar-width:none}
-  .topbar::-webkit-scrollbar{display:none}
-  .topbar > *{flex-shrink:0}
+  .topbar{
+    height:auto;min-height:var(--bar-h);flex-wrap:wrap;
+    gap:6px;padding:7px 8px;
+  }
+  .topbar .spacer{display:none}
   #twitter-link{display:none}
+  .topbar .btn{padding:6px 9px;font-size:11.5px}
+  .topbar .btn.lg{padding:7px 12px;font-size:12px;margin-left:auto}
+  .sitefoot{font-size:9px;gap:1px 8px}
+}
+
+/* Smallest phones: the rail's own controls stack their labels away and the
+   canvas keeps whatever is left. */
+@media (max-width:400px){
+  .app{padding:5px;gap:5px}
+  .topbar{gap:5px;padding:6px}
   .topbar .btn{padding:5px 8px;font-size:11px}
-  .topbar .btn.lg{padding:7px 11px;font-size:12px}
+  .seg.vert button{padding:5px 9px;font-size:11px}
+  .rail{gap:6px;padding:7px 8px}
+  .stage{padding:6px}
+  .scrim{padding:8px}
+  .dialog > header{padding:11px 12px}
+  .dialog > header h3{font-size:16px}
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
