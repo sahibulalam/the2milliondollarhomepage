@@ -1,3 +1,6 @@
-# Postgres driver, used only when DATABASE_URL is set. Local development runs
-# on SQLite and needs nothing installed at all.
-psycopg2-binary==2.9.9
+# Nothing is required to run this. The standard library covers the server and
+# SQLite, which is what a host with a disk (Railway, Render, Fly) uses.
+#
+# Uncomment only for a serverless host with no filesystem, where DATABASE_URL
+# points at Postgres instead:
+# psycopg2-binary==2.9.9

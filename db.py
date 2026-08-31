@@ -86,8 +86,14 @@ class Connection(object):
     def __init__(self):
         self._closed = False
         if IS_POSTGRES:
-            import psycopg2
-            import psycopg2.extras
+            try:
+                import psycopg2
+                import psycopg2.extras
+            except ImportError:
+                raise RuntimeError(
+                    "DATABASE_URL is set, so this needs the Postgres driver. "
+                    "Uncomment psycopg2-binary in requirements.txt, or unset "
+                    "DATABASE_URL to use the local SQLite file.")
             self._pg = True
             self._con = psycopg2.connect(config.DATABASE_URL,
                                          connect_timeout=10)

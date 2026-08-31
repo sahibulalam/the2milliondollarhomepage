@@ -259,6 +259,83 @@ rm -f data/app.db data/app.db-wal data/app.db-shm
 
 ---
 
+## Deploying to Railway
+
+Railway runs the process as-is, so nothing about the app changes: the same
+SQLite file, the same single process, exactly what is tested locally.
+
+### 1. Create the service
+
+New Project → Deploy from GitHub → this repo. `railway.json` supplies the
+start command (`python3 app.py`) and points the health check at `/healthz`,
+which answers without touching the database.
+
+### 2. Add a volume — do this before the first real claim
+
+Storage → Add Volume, mounted at **`/data`**. Without it the database lives on
+the container's ephemeral disk and every claim, payment record and visitor
+count is wiped on the next redeploy.
+
+Then set `DATA_DIR=/data` so the app writes there.
+
+### 3. Environment variables
+
+| | |
+|---|---|
+| `DATA_DIR` | `/data` — the mounted volume |
+| `BASE_URL` | `https://your-app.up.railway.app` — where Dodo returns payers |
+| `SITE_NAME` | `the2milliondollarhomepage` |
+| `TWITTER_HANDLE` | `hisahibul` |
+| `DODO_API_KEY` / `DODO_PRODUCT_ID` / `DODO_WEBHOOK_KEY` | from the Dodo dashboard |
+| `DODO_MODE` | `test`, then `live` |
+
+`PORT` and `HOST` are handled for you: Railway injects `PORT`, and the app
+takes that as the signal to bind `0.0.0.0` rather than localhost.
+
+Leave the Dodo keys unset and the site runs in demo mode — claims settle
+instantly, no money moves, and the page says so.
+
+### 4. Point Dodo at it
+
+Webhook endpoint `https://your-domain/api/webhook/dodo`, subscribed to
+`payment.succeeded`. Copy its signing secret into `DODO_WEBHOOK_KEY`.
+
+### Going live
+
+1. Deploy with `DODO_MODE=test` and buy a patch with a Dodo test card.
+2. Watch the logs for `settled clm_… : held`.
+3. Wipe the test data (`rm /data/app.db*` via a shell, or redeploy the volume).
+4. Set `DODO_MODE=live` and the live keys.
+
+### If something is wrong
+
+`https://your-domain/healthz` answers without the database or the disk. If it
+returns `ok` but the site does not load, the problem is the volume or
+`DATA_DIR`, not the deploy.
+
+---
+
+## Deploying somewhere serverless instead
+
+The repo also carries what Vercel needs — `api/index.py` (Vercel drives a
+`BaseHTTPRequestHandler` per request, and `app.Handler` already is one) and
+`vercel.json`. Serverless has no disk, so it additionally needs a Postgres:
+set `DATABASE_URL` and `db.py` switches engines, the SQL being written in the
+subset SQLite and Postgres share. Uncomment `psycopg2-binary` in
+`requirements.txt`.
+
+Railway needs none of that, which is why it is the path above.
+
+## Housekeeping
+
+Wipe demo data before going live:
+
+```bash
+rm -f data/app.db data/app.db-wal data/app.db-shm
+```
+
+---
+
 ## Deploying to Vercel
 
 Vercel is serverless, which changes two things and nothing else:

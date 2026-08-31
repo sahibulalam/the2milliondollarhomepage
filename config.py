@@ -15,13 +15,21 @@ def _env(name, default=""):
 
 
 # --- server ---------------------------------------------------------------
-HOST = _env("HOST", "127.0.0.1")
+# Every PaaS (Railway, Render, Fly, Heroku) hands the port in as $PORT and
+# expects the process to listen on all interfaces. Binding to localhost there
+# is the classic "deploys fine, health check never passes" mistake, so the
+# presence of $PORT is taken as the signal to bind publicly.
+_ON_PLATFORM = bool(_env("PORT"))
+HOST = _env("HOST", "0.0.0.0" if _ON_PLATFORM else "127.0.0.1")
 PORT = int(_env("PORT", "8787"))
 # Public origin, used to build return_url for the checkout. Must be the URL a
 # browser can reach; Dodo redirects the payer here after paying.
 BASE_URL = _env("BASE_URL", "http://127.0.0.1:%d" % PORT).rstrip("/")
 
-DB_PATH = ROOT / "data" / "app.db"
+# On a platform this points at the mounted volume, which is the only part of
+# the filesystem that survives a redeploy.
+DATA_DIR = pathlib.Path(_env("DATA_DIR") or (ROOT / "data"))
+DB_PATH = DATA_DIR / "app.db"
 # public/ is Vercel's static root: anything in it is served straight off the
 # CDN at "/<name>". The HTML lives in web/ instead, so requests for a page
 # reach the app -- which is what counts the visit and stamps asset versions.
