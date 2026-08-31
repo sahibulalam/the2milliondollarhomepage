@@ -25,6 +25,18 @@ class DodoError(Exception):
         self.body = body
 
 
+def _user_agent():
+    """Identify this client to Dodo.
+
+    Their API is behind Cloudflare, which blocks urllib's default
+    "Python-urllib/3.x" signature outright -- the request never reaches Dodo
+    and comes back as Cloudflare error 1010, which reads like an auth failure
+    but is not one. Any honest, named agent gets through.
+    """
+    host = config.BASE_URL or "https://example.invalid"
+    return "the2milliondollarhomepage/1.0 (+%s)" % host
+
+
 def _post(path, payload):
     req = urllib.request.Request(
         config.DODO_API_BASE + path,
@@ -34,6 +46,7 @@ def _post(path, payload):
             "Authorization": "Bearer " + config.DODO_API_KEY,
             "Content-Type": "application/json",
             "Accept": "application/json",
+            "User-Agent": _user_agent(),
         },
     )
     try:
