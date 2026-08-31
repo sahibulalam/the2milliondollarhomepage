@@ -18,10 +18,10 @@ outbidding rule dropped the need for it.
 """
 import json
 import secrets
-import sqlite3
 import time
 
 import config
+import db as _db
 import grid
 
 SCHEMA = """
@@ -61,31 +61,35 @@ CREATE TABLE IF NOT EXISTS webhook_seen (
   at         INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT);
+
+-- Rate limiting lives here rather than in memory: serverless instances share
+-- no state, so a per-process dict would let anyone around the limit simply by
+-- landing on a cold instance.
+CREATE TABLE IF NOT EXISTS attempt (
+  ip     TEXT NOT NULL,
+  at     INTEGER NOT NULL,
+  opened INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS attempt_ip ON attempt(ip, at);
 """
 
-# Held open for the life of the process so the connection count never reaches
-# zero: SQLite runs a full WAL checkpoint when the last connection closes.
+# Held open for the life of the process so SQLite's connection count never
+# reaches zero -- it runs a full WAL checkpoint when the last one closes, and
+# CPython holds the GIL across that. Irrelevant under Postgres.
 _keeper = None
 
 
 def connect():
-    config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(str(config.DB_PATH), timeout=10)
-    con.row_factory = sqlite3.Row
-    con.execute("PRAGMA busy_timeout=8000")
-    con.execute("PRAGMA foreign_keys=ON")
-    # WAL already survives a crash; NORMAL drops the fsync on every commit.
-    con.execute("PRAGMA synchronous=NORMAL")
-    return con
+    return _db.connect()
 
 
 def init():
     global _keeper
     con = connect()
-    # The result has to be read for the pragma to take effect.
-    mode = con.execute("PRAGMA journal_mode=WAL").fetchone()[0]
-    if mode != "wal":
-        print("warning: journal_mode is %r, not wal" % mode)
+    if not _db.IS_POSTGRES:
+        mode = con.pragma("journal_mode=WAL")
+        if mode != "wal":
+            print("warning: journal_mode is %r, not wal" % mode)
     with con:
         con.executescript(SCHEMA)
         shape = json.dumps({"cols": grid.COLS, "rows": grid.ROWS,
@@ -97,7 +101,7 @@ def init():
         con.execute("INSERT INTO meta (k,v) VALUES ('grid',?)"
                     " ON CONFLICT(k) DO UPDATE SET v=excluded.v", (shape,))
     con.close()
-    if _keeper is None:
+    if _keeper is None and not _db.IS_POSTGRES:
         _keeper = connect()
 
 
@@ -105,20 +109,21 @@ def init():
 
 # Two rectangles miss each other when one is entirely left of, right of, above
 # or below the other. Everything else is an overlap.
-_OVERLAP = ("status='paid' AND col < :c1 AND :c0 < col + cols"
-            " AND row < :r1 AND :r0 < row + rows")
+_OVERLAP = ("status='paid' AND col < ? AND ? < col + cols"
+            " AND row < ? AND ? < row + rows")
 
 
 def _bounds(col, row, cols, rows):
-    return {"c0": col, "c1": col + cols, "r0": row, "r1": row + rows}
+    # Order matches the placeholders in _OVERLAP.
+    return (col + cols, col, row + rows, row)
 
 
 def overlapping(con, col, row, cols, rows, limit=8):
     """Paid claims that intersect this rectangle."""
     return con.execute(
         "SELECT id, brand, col, row, cols, rows FROM claim WHERE "
-        + _OVERLAP + " LIMIT :lim",
-        dict(_bounds(col, row, cols, rows), lim=limit)).fetchall()
+        + _OVERLAP + " LIMIT ?",
+        _bounds(col, row, cols, rows) + (limit,)).fetchall()
 
 
 def overlap_area(con, col, row, cols, rows):
@@ -322,35 +327,81 @@ def settle_claim(con, claim_id, payment_id):
     return True, "held", c["tile_count"]
 
 
-_last_sweep = [0.0]
+def _meta_int(con, key, default=0):
+    r = con.execute("SELECT v FROM meta WHERE k=?", (key,)).fetchone()
+    try:
+        return int(r["v"]) if r else default
+    except (TypeError, ValueError):
+        return default
 
 
 def expire_stale(con, every=60):
-    """Retire unpaid claims that ran out of time.
+    """Retire unpaid claims that ran out of time, and prune old rate rows.
 
     Called from read paths, so it must not turn every page load into a write:
-    it runs at most once a minute, and only opens a transaction when there is
-    actually something to expire.
+    it runs at most once a minute -- tracked in the database, because
+    serverless instances do not share memory -- and only writes when there is
+    something to do.
     """
-    now = time.time()
-    if now - _last_sweep[0] < every:
-        return
-    _last_sweep[0] = now
-    cutoff = int(now) - config.CLAIM_TTL_SECONDS
-    if not con.execute("SELECT 1 FROM claim WHERE status='pending'"
-                       " AND created_at < ? LIMIT 1", (cutoff,)).fetchone():
+    now = int(time.time())
+    if now - _meta_int(con, "last_sweep") < every:
         return
     with con:
-        con.execute("UPDATE claim SET status='expired', settled_at=?"
-                    " WHERE status='pending' AND created_at < ?",
-                    (int(now), cutoff))
+        con.execute("INSERT INTO meta (k,v) VALUES ('last_sweep',?)"
+                    " ON CONFLICT(k) DO UPDATE SET v=excluded.v", (str(now),))
+    cutoff = now - config.CLAIM_TTL_SECONDS
+    if con.execute("SELECT 1 FROM claim WHERE status='pending'"
+                   " AND created_at < ? LIMIT 1", (cutoff,)).fetchone():
+        with con:
+            con.execute("UPDATE claim SET status='expired', settled_at=?"
+                        " WHERE status='pending' AND created_at < ?",
+                        (now, cutoff))
+    with con:
+        con.execute("DELETE FROM attempt WHERE at < ?", (now - 3600,))
+
+
+# ------------------------------------------------------------ rate limits --
+
+SPACING_SECONDS = 3
+CLAIMS_PER_HOUR = 15
+
+
+def throttled(con, ip):
+    """True if this address is going too fast.
+
+    No more than one attempt every few seconds, and a cap on claims actually
+    opened per hour. Attempts that fail validation cost only the spacing --
+    fumbling the form should not lock you out of buying.
+    """
+    now = int(time.time())
+    r = con.execute(
+        "SELECT MAX(at) AS last, COALESCE(SUM(opened),0) AS opened"
+        " FROM attempt WHERE ip=? AND at > ?", (ip, now - 3600)).fetchone()
+    if r and r["last"] and now - int(r["last"]) < SPACING_SECONDS:
+        return True
+    if r and int(r["opened"] or 0) >= CLAIMS_PER_HOUR:
+        return True
+    with con:
+        con.execute("INSERT INTO attempt (ip, at, opened) VALUES (?,?,0)",
+                    (ip, now))
+    return False
+
+
+def count_claim(con, ip):
+    """Record that a claim was actually opened, against the hourly budget."""
+    with con:
+        con.execute("INSERT INTO attempt (ip, at, opened) VALUES (?,?,1)",
+                    (ip, int(time.time())))
 
 
 def webhook_is_new(con, webhook_id):
-    try:
-        with con:
-            con.execute("INSERT INTO webhook_seen (webhook_id, at) VALUES (?,?)",
-                        (webhook_id, int(time.time())))
-        return True
-    except sqlite3.IntegrityError:
-        return False
+    """Standard Webhooks redelivers; settle each delivery id exactly once.
+
+    INSERT OR IGNORE rather than catching an integrity error, so this needs no
+    engine-specific exception type -- rowcount tells us whether it was new.
+    """
+    with con:
+        cur = con.execute(
+            "INSERT OR IGNORE INTO webhook_seen (webhook_id, at) VALUES (?,?)",
+            (webhook_id, int(time.time())))
+    return cur.rowcount > 0

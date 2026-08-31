@@ -257,6 +257,71 @@ Wipe demo data before going live:
 rm -f data/app.db data/app.db-wal data/app.db-shm
 ```
 
+---
+
+## Deploying to Vercel
+
+Vercel is serverless, which changes two things and nothing else:
+
+- **`api/index.py` is the entry point.** Vercel drives a
+  `BaseHTTPRequestHandler` per request, and `app.Handler` already is one, so
+  the whole router is reused. `vercel.json` rewrites every path to it, keeping
+  routing in one place. Nothing calls `serve_forever` there.
+- **Postgres replaces SQLite.** Vercel's filesystem is read-only apart from a
+  per-invocation `/tmp`, so a SQLite file would lose every claim between
+  requests. Set `DATABASE_URL` and `db.py` switches engines; the SQL is written
+  once in the subset both understand.
+
+Two smaller consequences of having no shared memory between instances: the
+rate limiter and the "sweep at most once a minute" marker both live in the
+database rather than in a module-level dict.
+
+### 1. A database
+
+Add **Vercel Postgres** (Neon) from the project's Storage tab, or create a free
+Neon project and copy its connection string. Use the **pooled** connection
+string — serverless opens a connection per invocation and a direct endpoint
+will run out.
+
+### 2. Environment variables
+
+In Vercel → Settings → Environment Variables:
+
+| | |
+|---|---|
+| `DATABASE_URL` | the pooled Postgres string |
+| `BASE_URL` | `https://your-domain.vercel.app` — where Dodo sends payers back |
+| `SITE_NAME` | `the2milliondollarhomepage` |
+| `TWITTER_HANDLE` | `hisahibul` |
+| `DODO_API_KEY` / `DODO_PRODUCT_ID` / `DODO_WEBHOOK_KEY` | from the Dodo dashboard |
+| `DODO_MODE` | `test`, then `live` |
+
+Leave the Dodo keys unset and the site runs in demo mode: claims settle
+instantly, no money moves, and the page says so.
+
+### 3. Deploy
+
+Import the repo, **Application Preset: Other**, no build command. The schema is
+created on the first cold start.
+
+### 4. Point Dodo at it
+
+Webhook endpoint `https://your-domain/api/webhook/dodo`, subscribed to
+`payment.succeeded`. Copy its signing secret into `DODO_WEBHOOK_KEY`.
+
+### What to check first
+
+`https://your-domain/healthz` answers without touching the database — if that
+works but `/api/state` does not, the problem is `DATABASE_URL`, not the deploy.
+
+### Running it locally is unchanged
+
+No `DATABASE_URL` means SQLite and a normal process:
+
+```bash
+./run.sh
+```
+
 ## Deploying
 
 Any host running Python 3.9+. Put it behind TLS, set `HOST=0.0.0.0`,

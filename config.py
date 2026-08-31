@@ -22,7 +22,16 @@ PORT = int(_env("PORT", "8787"))
 BASE_URL = _env("BASE_URL", "http://127.0.0.1:%d" % PORT).rstrip("/")
 
 DB_PATH = ROOT / "data" / "app.db"
+# public/ is Vercel's static root: anything in it is served straight off the
+# CDN at "/<name>". The HTML lives in web/ instead, so requests for a page
+# reach the app -- which is what counts the visit and stamps asset versions.
 PUBLIC = ROOT / "public"
+VIEWS = ROOT / "web"
+
+# Set this and the app talks to Postgres instead of the local SQLite file.
+# Required on serverless hosting (Vercel), where the filesystem does not
+# survive between requests. Neon/Vercel Postgres hand you this string.
+DATABASE_URL = _env("DATABASE_URL") or _env("POSTGRES_URL")
 
 # --- dodo payments --------------------------------------------------------
 # Test mode talks to test.dodopayments.com, live mode to live.dodopayments.com.

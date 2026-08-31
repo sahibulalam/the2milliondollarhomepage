@@ -18,7 +18,6 @@ import re
 import secrets
 import socket
 import sys
-import threading
 import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -29,13 +28,10 @@ import grid
 import store
 
 MAX_BODY = 2 * 1024 * 1024
+ASSETS = ("site.css", "app.js")
 MAX_BID_CENTS = 100_000_000          # $1,000,000 -- a typo guard, not a policy
 LOGO_RE = re.compile(r"^data:image/(png|jpeg|jpg|webp|gif);base64,([A-Za-z0-9+/=\s]+)$")
 COOKIE_RE = re.compile(r"(?:^|;\s*)mp_vid=([A-Za-z0-9_\-]{6,64})")
-
-_throttle = {}
-_throttle_lock = threading.Lock()
-
 
 # --------------------------------------------------------------- validation
 
@@ -127,34 +123,6 @@ def clean_amount(raw, minimum):
 
 def money(cents):
     return "$%s" % format(cents / 100.0, ",.2f").replace(".00", "")
-
-
-def throttled(ip):
-    """No more than one attempt every 3s, or 15 opened claims an hour.
-
-    Attempts that fail validation cost only the spacing, not the hourly
-    budget -- fumbling the form should not lock you out of buying.
-    """
-    now = time.time()
-    with _throttle_lock:
-        rec = _throttle.get(ip) or {"last": 0.0, "opened": []}
-        rec["opened"] = [t for t in rec["opened"] if now - t < 3600]
-        if now - rec["last"] < 3:
-            return True
-        if len(rec["opened"]) >= 15:
-            return True
-        rec["last"] = now
-        _throttle[ip] = rec
-        if len(_throttle) > 4000:
-            for k in [k for k, v in _throttle.items() if now - v["last"] > 3600]:
-                _throttle.pop(k, None)
-    return False
-
-
-def count_claim(ip):
-    with _throttle_lock:
-        rec = _throttle.setdefault(ip, {"last": time.time(), "opened": []})
-        rec["opened"].append(time.time())
 
 
 # ------------------------------------------------------------------ handler
@@ -252,7 +220,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/":
                 return self.page_index()
             if path == "/thanks":
-                return self.serve_page(config.PUBLIC / "thanks.html")
+                return self.serve_page(config.VIEWS / "thanks.html")
             if path.startswith("/logo/"):
                 return self.serve_logo(path[len("/logo/"):])
             if path == "/healthz":
@@ -269,6 +237,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.api_claim_status(path.rsplit("/", 1)[-1])
             if path.startswith("/static/"):
                 return self.serve_static(path[len("/static/"):])
+            # Root-relative assets. On Vercel these never reach the app -- the
+            # CDN serves them off the filesystem -- but locally they do.
+            if path.lstrip("/") in ASSETS:
+                return self.serve_static(path.lstrip("/"))
         except BrokenPipeError:
             return
         except Exception as e:                                   # noqa: BLE001
@@ -306,7 +278,7 @@ class Handler(BaseHTTPRequestHandler):
             store.touch_visitor(con, vid)
         finally:
             con.close()
-        self.serve_page(config.PUBLIC / "index.html",
+        self.serve_page(config.VIEWS / "index.html",
                         extra=[cookie] if cookie else [])
 
     def serve_page(self, p, extra=None):
@@ -324,7 +296,7 @@ class Handler(BaseHTTPRequestHandler):
                 stamp = "%x" % int((config.PUBLIC / asset).stat().st_mtime)
             except OSError:
                 continue
-            html = html.replace("/static/" + asset, "/static/%s?v=%s" % (asset, stamp))
+            html = html.replace("/" + asset, "/%s?v=%s" % (asset, stamp))
         head = list(extra or [])
         head.append(("Cache-Control", "no-store"))
         self._send(200, html, "text/html; charset=utf-8", head)
@@ -467,12 +439,12 @@ class Handler(BaseHTTPRequestHandler):
         }, [("Cache-Control", "no-store")])
 
     def api_claim(self):
-        if throttled(self._ip()):
-            return self._fail(429, "Slow down a moment, then try again.")
         d = self._json_body()
 
         con = store.connect()
         try:
+            if store.throttled(con, self._ip()):
+                return self._fail(429, "Slow down a moment, then try again.")
             store.expire_stale(con)
             rect = clean_rect(d)
             brand = clean_brand(d.get("brand"))
@@ -493,7 +465,7 @@ class Handler(BaseHTTPRequestHandler):
             amount = clean_amount(d.get("amount"), q["total_cents"])
 
             claim_id = store.open_claim(con, rect, brand, url, logo, email, amount)
-            count_claim(self._ip())
+            store.count_claim(con, self._ip())
 
             if config.DEMO_MODE:
                 store.settle_claim(con, claim_id, "demo_" + claim_id)

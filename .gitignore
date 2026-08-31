@@ -3,3 +3,4 @@ data/
 public/hero.*
 ._*
 .DS_Store
+.vercel/

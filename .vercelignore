@@ -1,0 +1,11 @@
+data/
+backups/
+src/
+*.webp
+build_hall.py
+build_tattoo.py
+hall.html
+tattoo_page.html
+inked_state.json
+live_state.json
+.env
