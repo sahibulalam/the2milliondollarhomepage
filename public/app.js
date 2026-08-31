@@ -384,6 +384,10 @@ function renderFigures() {
   $("f-blocks").textContent = "of " + num(s.pixels);
   $("f-price").textContent = money(G.pixel_cents);
   $("nav-price").textContent = money(G.pixel_cents);
+  // The rate is per pixel; the block is what you actually have to buy.
+  $("nav-unit").textContent = G.byPixel
+    ? "any shape you like"
+    : money(G.floor_cents) + " a " + G.tile_px + "\u00d7" + G.tile_px + " block";
   $("nav-views").textContent = num(s.pageviews);
   $("f-price-sub").textContent = G.byPixel
     ? "per pixel, any shape you like"
@@ -524,7 +528,10 @@ function load() {
       $("demo-card").hidden = !d.demo;
       $("rulesline").textContent =
         "Once a pixel is sold it belongs to its buyer for good — it never goes "
-        + "back on the market. One purchase can cover up to "
+        + "back on the market. "
+        + (G.byPixel ? "" : "Pixels are sold in " + G.tile_px + "×"
+            + G.tile_px + " blocks of " + num(G.px_per_block) + ". ")
+        + "One purchase can cover up to "
         + num(G.max_tiles * G.px_per_block) + " pixels.";
       applySite(d.site);
       layout();
@@ -538,7 +545,9 @@ function applySite(site) {
   if (!site) return;
   if (site.name) {
     $("brand-name").textContent = site.name;
-    document.title = site.name + " — " + money(G.pixel_cents) + " a pixel";
+    document.title = site.name + " — " + (G.byPixel
+      ? money(G.pixel_cents) + " a pixel"
+      : money(G.floor_cents) + " a block");
   }
   if (site.twitter) {
     var url = "https://x.com/" + encodeURIComponent(site.twitter);
@@ -591,8 +600,11 @@ function syncSelection() {
 
   $("sel-total").textContent = quote ? money(quote.total_cents) : "…";
   $("price-hint").textContent = quote
-    ? money(G.pixel_cents) + " a pixel. Yours permanently — nobody can buy it "
-      + "off you afterwards."
+    ? (G.byPixel
+        ? money(G.pixel_cents) + " a pixel."
+        : money(G.floor_cents) + " a " + G.tile_px + "×" + G.tile_px
+          + " block (" + money(G.pixel_cents) + " a pixel).")
+      + " Yours permanently — nobody can buy it off you afterwards."
     : "";
   verdict();
 }

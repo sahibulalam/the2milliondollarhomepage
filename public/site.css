@@ -253,13 +253,12 @@ a{color:inherit}
 
 .selbox{
   position:absolute;z-index:6;pointer-events:none;
-  border:2px solid var(--ink);background:rgba(166,224,205,.5);
-  box-shadow:var(--shadow);
+  background:rgba(166,224,205,.5);
 }
-/* dragged across pixels somebody already owns: this area is not for sale */
+/* dragged across pixels somebody already owns: this area is not for sale.
+   With no outline to change, the fill alone has to carry the warning. */
 .selbox.blocked{
   background:rgba(232,131,107,.42);
-  border-style:dashed;
 }
 
 .statusbar{
@@ -498,3 +497,10 @@ input:focus{outline:none;box-shadow:var(--shadow-sm)}
 .sitefoot b{color:var(--ink-2);font-weight:700}
 /* thanks.html is a centred card on a scrolling page, not the fixed app shell. */
 main > .sitefoot{max-width:560px;margin:18px auto 28px;padding:0 4px}
+
+/* The minimum purchase, under the per-pixel rate in the rail. A block is what
+   a buyer commits to, so the rate alone would understate the entry price. */
+.price .unit{
+  display:block;font-style:normal;font-size:9.5px;line-height:1.4;
+  color:var(--ink-3);margin-top:2px;letter-spacing:0;
+}
