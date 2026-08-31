@@ -59,6 +59,10 @@ a{color:inherit}
 .brand .logo{width:26px;height:26px;flex:none;display:block}
 .brand .name{font-family:var(--mono);font-weight:700;font-size:15px;letter-spacing:-.02em}
 .topbar .spacer{flex:1}
+/* Two labels per control, one shown at a time. Swapping the text is what
+   keeps the bar on one line at phone widths; wrapping it onto a second line
+   costs the canvas about fifty pixels of height it cannot spare. */
+.narrow{display:none}
 
 .pill{
   display:inline-flex;align-items:baseline;gap:6px;padding:5px 11px;white-space:nowrap;
@@ -511,14 +515,18 @@ input:focus{outline:none;box-shadow:var(--shadow-sm)}
    site, and #cta stays because the rail's copy of it is disabled until
    something is selected. */
 @media (max-width:560px){
+  /* Short labels, so the bar stays a single row. flex-wrap is kept only as a
+     safety net: if a translation or a large font size overflows anyway, the
+     bar grows instead of clipping the buy button off the end. */
+  .wide{display:none}
+  .narrow{display:inline}
   .topbar{
     height:auto;min-height:var(--bar-h);flex-wrap:wrap;
-    gap:6px;padding:7px 8px;
+    gap:6px;padding:0 9px;
   }
-  .topbar .spacer{display:none}
   #twitter-link{display:none}
-  .topbar .btn{padding:6px 9px;font-size:11.5px}
-  .topbar .btn.lg{padding:7px 12px;font-size:12px;margin-left:auto}
+  .topbar .btn{padding:6px 10px;font-size:11.5px}
+  .topbar .btn.lg{padding:8px 13px;font-size:12.5px}
   .sitefoot{font-size:9px;gap:1px 8px}
 }
 
