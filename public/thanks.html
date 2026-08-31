@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Payment &mdash; A Million Pixels</title>
+<link rel="stylesheet" href="/static/site.css">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%22-2%20-2%2030%2030%22%3E%3Crect%20x%3D%22-2%22%20y%3D%22-2%22%20width%3D%2230%22%20height%3D%2230%22%20rx%3D%226%22%20fill%3D%22%23fff%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%220%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%222%22%20fill%3D%22%233b5bfd%22%2F%3E%3Crect%20x%3D%229.5%22%20y%3D%220%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%222%22%20fill%3D%22%2393a4ff%22%2F%3E%3Crect%20x%3D%2219%22%20y%3D%220%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%222%22%20fill%3D%22%23ff5c2b%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%229.5%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%222%22%20fill%3D%22%23c9d2ff%22%2F%3E%3Crect%20x%3D%229.5%22%20y%3D%229.5%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%222%22%20fill%3D%22%233b5bfd%22%2F%3E%3Crect%20x%3D%2219%22%20y%3D%229.5%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%222%22%20fill%3D%22%230f9d58%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%2219%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%222%22%20fill%3D%22%23f5a524%22%2F%3E%3Crect%20x%3D%229.5%22%20y%3D%2219%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%222%22%20fill%3D%22%23c9d2ff%22%2F%3E%3Crect%20x%3D%2219%22%20y%3D%2219%22%20width%3D%227%22%20height%3D%227%22%20rx%3D%222%22%20fill%3D%22none%22%20stroke%3D%22%233b5bfd%22%20stroke-width%3D%221.6%22%2F%3E%3C%2Fsvg%3E">
+<style>
+  body{background:#3a6ea5;display:grid;place-items:center;height:100%}
+  .wrap{width:min(460px,calc(100vw - 32px))}
+  .figures{margin:14px 0 0}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <section class="dialog">
+    <header><h3 id="head">Confirming payment</h3></header>
+    <div class="body">
+      <div id="note" class="note">
+        <span class="ni" aria-hidden="true">&#9203;</span>
+        <span id="msg">Checking with the payment provider&hellip;</span>
+      </div>
+      <div class="bar" id="bar"><i></i></div>
+      <div class="figures" id="detail" hidden>
+        <div class="fig"><div class="k">Pixels</div><div class="v" id="d-px">&mdash;</div>
+          <div class="sub" id="d-blocks"></div></div>
+        <div class="fig"><div class="k">Paid</div><div class="v money" id="d-amt">&mdash;</div>
+          <div class="sub" id="d-brand"></div></div>
+      </div>
+      <div style="height:18px"></div>
+      <a class="btn primary big" href="/" style="display:block;text-align:center;text-decoration:none">Back to the grid</a>
+    </div>
+  </section>
+</main>
+<script>
+(function () {
+  "use strict";
+  var id = new URLSearchParams(location.search).get("claim");
+  var tries = 0;
+  function $(x){ return document.getElementById(x); }
+  function money(c) {
+    var n = (c || 0) / 100;
+    return "$" + n.toLocaleString("en-US",
+      { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 });
+  }
+  function num(n){ return (n||0).toLocaleString("en-US"); }
+  function done(cls, icon, title, text) {
+    $("bar").hidden = true;
+    $("note").className = "note " + cls;
+    $("note").firstElementChild.textContent = icon;
+    $("head").textContent = title;
+    $("msg").textContent = text;
+  }
+  function poll() {
+    if (!id) return done("bad", "\u26d4", "No claim", "This link has no claim on it.");
+    fetch("/api/claim/" + encodeURIComponent(id))
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function (c) {
+        $("detail").hidden = false;
+        $("d-px").textContent = num(c.pixels);
+        $("d-blocks").textContent = c.cols + " \u00d7 " + c.rows + " blocks";
+        $("d-amt").textContent = money(c.amount_cents);
+        $("d-brand").textContent = c.brand;
+        if (c.status === "paid")
+          return done("good", "\u2705", "Payment confirmed",
+            "Paid. " + c.brand + " now holds " + num(c.pixels)
+            + " pixels \u2014 until somebody pays more for them.");
+        if (c.status === "failed" || c.status === "expired")
+          return done("bad", "\u26d4", "Payment not completed",
+            "Nothing was charged and no pixels changed hands.");
+        // Webhooks land a moment after the redirect; give them ~60s.
+        if (++tries > 30)
+          return done("warn", "\u26a0", "Still waiting",
+            "The payment provider has not confirmed yet. If you were charged, "
+            + "the grid updates on its own \u2014 reload in a minute.");
+        setTimeout(poll, 2000);
+      })
+      .catch(function () { done("bad", "\u26d4", "Unknown claim", "We cannot find that claim."); });
+  }
+  poll();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+data/
+.env
+public/hero.*
+._*
+.DS_Store

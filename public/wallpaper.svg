@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Rolling green hill under a blue sky">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#1b53a8"/>
+      <stop offset="26%"  stop-color="#2f79cf"/>
+      <stop offset="55%"  stop-color="#69a8e4"/>
+      <stop offset="80%"  stop-color="#a9cff0"/>
+      <stop offset="100%" stop-color="#d6e8f7"/>
+    </linearGradient>
+    <linearGradient id="hill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#8fc44a"/>
+      <stop offset="30%"  stop-color="#6faf33"/>
+      <stop offset="70%"  stop-color="#4e8f24"/>
+      <stop offset="100%" stop-color="#2f6b16"/>
+    </linearGradient>
+    <linearGradient id="hill2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#a6d15f"/>
+      <stop offset="100%" stop-color="#63a52c"/>
+    </linearGradient>
+    <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%"   stop-color="#ffffff" stop-opacity=".55"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-40%" y="-60%" width="180%" height="240%">
+      <feGaussianBlur stdDeviation="16"/>
+    </filter>
+    <filter id="softer" x="-40%" y="-60%" width="180%" height="240%">
+      <feGaussianBlur stdDeviation="30"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#sky)"/>
+  <ellipse cx="1180" cy="180" rx="520" ry="360" fill="url(#sun)"/>
+
+  <!-- clouds: three drifting bands, each a cluster of blurred lozenges -->
+  <g fill="#ffffff" filter="url(#soft)">
+    <g class="cloudband" style="--dur:150s;--from:0px;--to:1900px" opacity=".92">
+      <ellipse cx="200" cy="190" rx="150" ry="40"/>
+      <ellipse cx="290" cy="165" rx="105" ry="52"/>
+      <ellipse cx="120" cy="205" rx="90"  ry="30"/>
+      <ellipse cx="640" cy="120" rx="130" ry="34"/>
+      <ellipse cx="710" cy="103" rx="86"  ry="44"/>
+    </g>
+    <g class="cloudband" style="--dur:230s;--from:-600px;--to:1700px" opacity=".7">
+      <ellipse cx="980"  cy="290" rx="190" ry="36"/>
+      <ellipse cx="1060" cy="268" rx="120" ry="46"/>
+      <ellipse cx="1420" cy="215" rx="150" ry="30"/>
+    </g>
+  </g>
+  <g fill="#ffffff" filter="url(#softer)" opacity=".5">
+    <g class="cloudband" style="--dur:320s;--from:-900px;--to:1750px">
+      <ellipse cx="420" cy="360" rx="300" ry="34"/>
+      <ellipse cx="1250" cy="395" rx="260" ry="28"/>
+    </g>
+  </g>
+
+  <!-- far ridge -->
+  <path fill="url(#hill2)" opacity=".85"
+        d="M0 612 C 240 560, 430 596, 640 620 C 900 650, 1120 584, 1350 600 C 1470 609, 1540 626, 1600 636 L1600 1000 L0 1000 Z"/>
+  <!-- the hill -->
+  <path fill="url(#hill)"
+        d="M0 760 C 210 646, 470 596, 760 640 C 1010 678, 1220 762, 1420 800 C 1490 813, 1550 820, 1600 824 L1600 1000 L0 1000 Z"/>
+  <!-- sunlit crest and a shadowed fold, so the hill has a shape -->
+  <path fill="#b6dd6e" opacity=".45"
+        d="M0 762 C 210 648, 470 598, 760 642 C 900 663, 1020 704, 1130 744 C 1000 726, 880 706, 745 692 C 470 664, 220 700, 0 800 Z"/>
+  <path fill="#1f5410" opacity=".22"
+        d="M0 1000 C 300 900, 700 872, 1080 900 C 1290 916, 1460 950, 1600 986 L1600 1000 Z"/>
+</svg>
