@@ -476,9 +476,14 @@ input:focus{outline:none;box-shadow:var(--shadow-sm)}
   .rail{width:auto;flex-direction:row;align-items:center;flex-wrap:wrap;gap:8px;
         border-right:0;border-bottom:2px dashed var(--rule);padding:8px 10px}
   .rail-label,.rail-rule,.rail .readout{display:none}
+  /* The standing rate and its minimum are reference, not action. Laid out as
+     a row they push the selection's own total and the buy button onto another
+     line, which is the line that matters. Both still appear in the dialog,
+     beside the amount they apply to, and the rail keeps the running total. */
+  .rail .price,.rail .unit{display:none}
   .seg.vert{flex-direction:row;border-radius:99px}
   .seg.vert button{border-bottom:0;border-right:1px dashed var(--rule);padding:5px 11px}
-  .rail .btn{width:auto;margin-left:auto}
+  .rail .btn{width:auto;margin-left:auto;flex:none;padding:8px 15px}
   .rail .selinfo{display:flex;align-items:baseline;gap:9px;padding:6px 10px;
                  flex:1 1 160px;min-width:0;overflow:hidden}
   .rail .selinfo .k{display:none}
