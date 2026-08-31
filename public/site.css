@@ -55,8 +55,14 @@ a{color:inherit}
   padding:0 14px;background:var(--card);
   border:2px solid var(--ink);border-radius:var(--radius);box-shadow:var(--shadow);
 }
-.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;white-space:nowrap}
-.brand .logo{width:26px;height:26px;flex:none;display:block}
+/* flex:none on the brand too: in a bar tight enough to shrink its items,
+   the mark is the last thing that should give. */
+.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;
+       white-space:nowrap;flex:none}
+/* 28px for a 28-unit viewBox: the outlined square's stroke sits 0.7 outside
+   its rect, so the box is padded by one unit and the mark drawn a little
+   larger to keep the squares the size they were. */
+.brand .logo{width:28px;height:28px;flex:none;display:block}
 .brand .name{font-family:var(--mono);font-weight:700;font-size:15px;letter-spacing:-.02em}
 .topbar .spacer{flex:1}
 /* Two labels per control, one shown at a time. Swapping the text is what
